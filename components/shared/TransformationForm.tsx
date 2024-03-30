@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   aspectRatioOptions,
+  creditFee,
   defaultValues,
   transformationTypes,
 } from "@/constants";
@@ -27,8 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
-import { AspectRatioKey } from "@/lib/utils";
+import { useState, useTransition } from "react";
+import { AspectRatioKey, debounce, deepMergeObjects } from "@/lib/utils";
+import { updateCredits } from "@/lib/actions/user.actions";
+import MediaUploader from "./MediaUploader";
 
 export const formSchema = z.object({
   title: z.string(),
@@ -52,7 +55,8 @@ const TransformationForm = ({
     useState<Transformations | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTransforming, setIsTransforming] = useState(false);
-  const [tranformationConfig, setTranformationConfig] = useState(config);
+  const [transformationConfig, setTranformationConfig] = useState(config);
+  const [isPending, startTransition] = useTransition();
   const initialValues =
     data && action === "Update"
       ? {
@@ -74,18 +78,51 @@ const TransformationForm = ({
   }
 
   const onSelectFieldHandler = (
-    value: String,
+    value: string,
     onChangeField: (value: string) => void
-  ) => {};
+  ) => {
+    const imageSize = aspectRatioOptions[value as AspectRatioKey];
+    setImage((prev: any) => ({
+      ...prev,
+      aspectRatio: imageSize.aspectRatio,
+      width: imageSize.width,
+      height: imageSize.height,
+    }));
+
+    setNewTranformation(transformationType.config);
+
+    return onChangeField(value);
+  };
 
   const onInputChangeHandler = (
-    field: string,
+    fieldName: string,
     value: string,
     type: string,
     onChangeField: (value: string) => void
-  ) => {};
+  ) => {
+    debounce(() => {
+      setNewTranformation((prev: any) => ({
+        ...prev,
+        [type]: {
+          ...prev?.[type],
+          [fieldName === "prompt" ? "prompt" : "to"]: value,
+        },
+      }));
+    }, 1000);
 
-  const onTransformHandle = () => {};
+    return onChangeField(value);
+  };
+
+  const onTransformHandle = async () => {
+    setIsTransforming(true);
+    setTranformationConfig(
+      deepMergeObjects(newTranformation, transformationConfig)
+    );
+    setNewTranformation(null);
+    startTransition(async () => {
+      // await updateCredits(userId, creditFee)
+    });
+  };
 
   return (
     <Form {...form}>
@@ -114,7 +151,7 @@ const TransformationForm = ({
                 </SelectTrigger>
                 <SelectContent>
                   {Object.keys(aspectRatioOptions).map((key) => (
-                    <SelectItem key={key} value="key" className="select-item">
+                    <SelectItem key={key} value={key} className="select-item">
                       {aspectRatioOptions[key as AspectRatioKey].label}
                     </SelectItem>
                   ))}
@@ -173,6 +210,24 @@ const TransformationForm = ({
             )}
           </div>
         )}
+
+        <div className="media-uploader-field">
+          <CustomField
+            control={form.control}
+            name="publicId"
+            className="flex size-full flex-col"
+            render={({ field }) => (
+              <MediaUploader
+                onValueChange={field.onChange}
+                setImage={setImage}
+                publicId={field.value}
+                image={image}
+                type={type}
+              />
+            )}
+          />
+        </div>
+
         <div className="flex flex-col gap-4">
           <Button
             type="button"
