@@ -1,3 +1,4 @@
+"use client";
 import Image from "next/image";
 import { useToast } from "../ui/use-toast";
 import { CldImage, CldUploadWidget } from "next-cloudinary";
@@ -19,6 +20,16 @@ const MediaUploader = ({
 }: MediaUploaderProps) => {
   const { toast } = useToast();
   const onUploadSuccessHandler = (result: any) => {
+    setImage((prev: any) => ({
+      ...prev,
+      publicId: result?.info?.public_id,
+      width: result?.info?.width,
+      height: result?.info?.height,
+      secureURL: result?.info?.secure_url,
+    }));
+
+    onValueChange(result?.info?.public_id);
+
     return toast({
       title: "Image uploaded successfully",
       description: "1 credit deducted",
@@ -34,6 +45,7 @@ const MediaUploader = ({
       className: "error-toast",
     });
   };
+
   return (
     <CldUploadWidget
       uploadPreset="jsm_imagineAI"
